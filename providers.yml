@@ -1,0 +1,70 @@
+# Provider configuration for AprilV2
+# Defines enabled providers, their weights, and capabilities
+
+chat_providers:
+  openai:
+    enabled: true
+    weight: 0.7
+    capabilities:
+      - text_generation
+      - conversation
+    models:
+      - gpt-4
+      - gpt-3.5-turbo
+    max_tokens: 4096
+    
+  anthropic:
+    enabled: true
+    weight: 0.3
+    capabilities:
+      - text_generation
+      - conversation
+    models:
+      - claude-3-opus
+      - claude-3-sonnet
+    max_tokens: 4096
+
+image_providers:
+  openai:
+    enabled: true
+    weight: 0.5
+    capabilities:
+      - image_generation
+    models:
+      - dall-e-3
+      - dall-e-2
+    max_resolution: "1024x1024"
+    
+  stability:
+    enabled: true
+    weight: 0.5
+    capabilities:
+      - image_generation
+    models:
+      - stable-diffusion-xl
+    max_resolution: "1024x1024"
+
+speech_providers:
+  openai:
+    enabled: true
+    weight: 0.6
+    capabilities:
+      - text_to_speech
+    voices:
+      - alloy
+      - echo
+      - fable
+      - onyx
+      - nova
+      - shimmer
+      
+  elevenlabs:
+    enabled: true
+    weight: 0.4
+    capabilities:
+      - text_to_speech
+    voices:
+      - Rachel
+      - Drew
+      - Clyde
+      - Paul
