@@ -1,0 +1,63 @@
+# Service configuration for AprilV2
+# Defines service options including logging, monitoring, and limits
+
+# Server configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "aprilv2.log"
+  max_file_size: "10MB"
+  backup_count: 5
+
+# Loki configuration for log aggregation
+loki:
+  enabled: false
+  url: "http://localhost:3100"
+  labels:
+    service: "aprilv2"
+    environment: "production"
+
+# Rate limiting and service limits
+limits:
+  # Requests per minute per IP
+  rate_limit: 60
+  
+  # Maximum request sizes
+  max_prompt_length: 4000
+  max_message_length: 2000
+  max_text_length: 5000
+  
+  # Image generation limits
+  max_image_width: 2048
+  max_image_height: 2048
+  
+  # Timeout settings (in seconds)
+  request_timeout: 30
+  chat_timeout: 25
+  draw_timeout: 60
+  speak_timeout: 30
+
+# CORS settings
+cors:
+  allow_origins:
+    - "http://localhost:3000"
+    - "https://yourdomain.com"
+  allow_credentials: true
+  allow_methods:
+    - "GET"
+    - "POST"
+  allow_headers:
+    - "*"
+
+# Monitoring and health checks
+monitoring:
+  health_check_interval: 30
+  metrics_enabled: true
+  prometheus_port: 9090
