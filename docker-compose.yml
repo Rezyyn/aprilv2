@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  april-v2:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - PROVIDERS_CONFIG_PATH=providers.yml
+      # Add your API keys here or use a .env file
+      # - OPENAI_API_KEY=your_openai_key
+      # - ANTHROPIC_API_KEY=your_anthropic_key
+      # - DEEPSEEK_API_KEY=your_deepseek_key
+      # - ELEVENLABS_API_KEY=your_elevenlabs_key
+    volumes:
+      - ./providers.yml:/app/providers.yml:ro
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Loki for logging (optional)
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    restart: unless-stopped
+
+  # Grafana for log visualization (optional)
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+volumes:
+  loki_data:
+  grafana_data:

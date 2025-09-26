@@ -1,139 +1,127 @@
-"""
-AprilV2 API Server
-Provides endpoints for chat, drawing, speech, and health checks.
-"""
+"""Main FastAPI application for April v2."""
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional
-import yaml
-import os
+import structlog
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="AprilV2 API", version="1.0.0")
+from april.config.settings import settings
+from april.core.manager import AprilManager
+from april.api.endpoints import router, manager as global_manager
 
-# Request models
-class ChatRequest(BaseModel):
-    user_id: str
-    message: str
-    persona: str = "default"
 
-class DrawRequest(BaseModel):
-    prompt: str
-    width: int = 1024
-    height: int = 1024
+# Configure structured logging
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
 
-class SpeakRequest(BaseModel):
-    text: str
-    voice: str = "Rachel"
+logger = structlog.get_logger()
 
-# Response models
-class HealthResponse(BaseModel):
-    status: str
 
-class ChatResponse(BaseModel):
-    response: str
-    persona: str
-    user_id: str
-
-class DrawResponse(BaseModel):
-    image_url: str
-    prompt: str
-    width: int
-    height: int
-
-class SpeakResponse(BaseModel):
-    audio_url: str
-    voice: str
-    text: str
-
-# Load configuration
-def load_config():
-    """Load configuration from YAML files."""
-    config = {}
-    providers = {}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Startup
+    logger.info("Starting April v2")
     
-    if os.path.exists("config.yml"):
-        with open("config.yml", "r") as f:
-            config = yaml.safe_load(f) or {}
+    # Load configuration
+    try:
+        settings.load_providers_config()
+        logger.info("Loaded providers configuration")
+    except Exception as e:
+        logger.error("Failed to load providers configuration", error=str(e))
+        raise
     
-    if os.path.exists("providers.yml"):
-        with open("providers.yml", "r") as f:
-            providers = yaml.safe_load(f) or {}
+    # Initialize manager
+    april_manager = AprilManager(settings)
+    await april_manager.initialize()
     
-    return config, providers
+    # Set global manager instance
+    global global_manager
+    import april.api.endpoints
+    april.api.endpoints.manager = april_manager
+    
+    logger.info("April v2 started successfully")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down April v2")
 
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint."""
-    return HealthResponse(status="ok")
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """
-    Chat endpoint that processes messages with specified persona.
-    """
-    config, providers = load_config()
-    
-    # Basic validation
-    if not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
-    
-    # For now, return a mock response
-    # In a real implementation, this would integrate with chat providers
-    response_text = f"Hello {request.user_id}! I received your message: '{request.message}'. I'm responding as the '{request.persona}' persona."
-    
-    return ChatResponse(
-        response=response_text,
-        persona=request.persona,
-        user_id=request.user_id
-    )
+# Create FastAPI app
+app = FastAPI(
+    title=settings.app_name,
+    description="FastAPI backend for April v2 AI assistant",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
-@app.post("/draw", response_model=DrawResponse)
-async def draw(request: DrawRequest):
-    """
-    Draw endpoint that generates images from text prompts.
-    """
-    config, providers = load_config()
-    
-    # Basic validation
-    if not request.prompt.strip():
-        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-    
-    if request.width <= 0 or request.height <= 0:
-        raise HTTPException(status_code=400, detail="Width and height must be positive")
-    
-    # For now, return a mock response
-    # In a real implementation, this would integrate with image generation providers
-    mock_image_url = f"https://placeholder.com/{request.width}x{request.height}"
-    
-    return DrawResponse(
-        image_url=mock_image_url,
-        prompt=request.prompt,
-        width=request.width,
-        height=request.height
-    )
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.post("/speak", response_model=SpeakResponse)
-async def speak(request: SpeakRequest):
-    """
-    Speech synthesis endpoint that converts text to speech.
-    """
-    config, providers = load_config()
+# Include API routes
+app.include_router(router, prefix="/api/v1")
+
+# Add health endpoint at root level too
+@app.get("/health")
+async def health_root():
+    """Health check endpoint at root level."""
+    return {"status": "healthy", "service": "april-v2"}
+
+# WebSocket endpoint
+from april.api.websocket import websocket_endpoint
+
+@app.websocket("/ws/{user_id}")
+async def websocket_handler(websocket, user_id: str):
+    """WebSocket endpoint for real-time communication."""
+    # Get manager from global scope
+    import april.api.endpoints
+    april_manager = april.api.endpoints.manager
+    if april_manager is None:
+        await websocket.close(code=1000, reason="Manager not initialized")
+        return
     
-    # Basic validation
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
-    
-    # For now, return a mock response
-    # In a real implementation, this would integrate with TTS providers
-    mock_audio_url = f"https://audio.example.com/speech/{hash(request.text + request.voice)}.mp3"
-    
-    return SpeakResponse(
-        audio_url=mock_audio_url,
-        voice=request.voice,
-        text=request.text
-    )
+    await websocket_endpoint(websocket, user_id, april_manager)
+
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "service": "April v2",
+        "version": "0.1.0",
+        "status": "running"
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        "main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        log_level="info"
+    )

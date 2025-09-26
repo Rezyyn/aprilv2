@@ -1,70 +1,117 @@
-# Provider configuration for AprilV2
-# Defines enabled providers, their weights, and capabilities
-
-chat_providers:
-  openai:
-    enabled: true
-    weight: 0.7
-    capabilities:
-      - text_generation
-      - conversation
-    models:
-      - gpt-4
-      - gpt-3.5-turbo
-    max_tokens: 4096
-    
-  anthropic:
-    enabled: true
-    weight: 0.3
-    capabilities:
-      - text_generation
-      - conversation
-    models:
-      - claude-3-opus
-      - claude-3-sonnet
-    max_tokens: 4096
-
-image_providers:
-  openai:
-    enabled: true
-    weight: 0.5
-    capabilities:
-      - image_generation
-    models:
-      - dall-e-3
-      - dall-e-2
-    max_resolution: "1024x1024"
-    
-  stability:
-    enabled: true
-    weight: 0.5
-    capabilities:
-      - image_generation
-    models:
-      - stable-diffusion-xl
-    max_resolution: "1024x1024"
-
-speech_providers:
-  openai:
-    enabled: true
-    weight: 0.6
-    capabilities:
-      - text_to_speech
-    voices:
-      - alloy
-      - echo
-      - fable
-      - onyx
-      - nova
-      - shimmer
+# Provider configuration for April v2
+providers:
+  llm:
+    openai:
+      enabled: true
+      weight: 0.4
+      models:
+        - name: "gpt-4-turbo-preview"
+          max_tokens: 4096
+          capabilities: ["text", "function_calling"]
+        - name: "gpt-3.5-turbo"
+          max_tokens: 4096
+          capabilities: ["text", "function_calling"]
+      api_key_env: "OPENAI_API_KEY"
       
-  elevenlabs:
+    deepseek:
+      enabled: true
+      weight: 0.3
+      models:
+        - name: "deepseek-chat"
+          max_tokens: 4096
+          capabilities: ["text", "code"]
+      api_key_env: "DEEPSEEK_API_KEY"
+      base_url: "https://api.deepseek.com/v1"
+      
+    claude:
+      enabled: true
+      weight: 0.2
+      models:
+        - name: "claude-3-opus-20240229"
+          max_tokens: 4096
+          capabilities: ["text", "reasoning"]
+        - name: "claude-3-sonnet-20240229"
+          max_tokens: 4096
+          capabilities: ["text", "reasoning"]
+      api_key_env: "ANTHROPIC_API_KEY"
+      
+    grok:
+      enabled: false
+      weight: 0.1
+      models:
+        - name: "grok-1"
+          max_tokens: 4096
+          capabilities: ["text", "humor"]
+      api_key_env: "GROK_API_KEY"
+      base_url: "https://api.x.ai/v1"
+
+  speech:
+    elevenlabs:
+      enabled: true
+      weight: 1.0
+      voices:
+        - voice_id: "21m00Tcm4TlvDq8ikWAM"
+          name: "Rachel"
+        - voice_id: "AZnzlk1XvdvUeBnXmlld"
+          name: "Domi"
+      api_key_env: "ELEVENLABS_API_KEY"
+
+  image:
+    openai:
+      enabled: true
+      weight: 0.6
+      models:
+        - name: "dall-e-3"
+          max_size: "1024x1024"
+          capabilities: ["generation", "editing"]
+      api_key_env: "OPENAI_API_KEY"
+      
+    deepseek:
+      enabled: true
+      weight: 0.4
+      models:
+        - name: "deepseek-image"
+          max_size: "1024x1024"
+          capabilities: ["generation"]
+      api_key_env: "DEEPSEEK_API_KEY"
+
+  video:
+    sora:
+      enabled: false
+      weight: 0.6
+      models:
+        - name: "sora-1.0"
+          max_duration: 60
+          capabilities: ["generation"]
+      api_key_env: "OPENAI_API_KEY"
+      
+    kling:
+      enabled: false
+      weight: 0.4
+      models:
+        - name: "kling-1.0"
+          max_duration: 30
+          capabilities: ["generation"]
+      api_key_env: "KLING_API_KEY"
+
+# Logging configuration
+logging:
+  loki:
+    enabled: false
+    url: "http://loki:3100"
+    labels:
+      service: "april-v2"
+      environment: "development"
+
+# Core manager settings
+core:
+  memory:
     enabled: true
-    weight: 0.4
-    capabilities:
-      - text_to_speech
-    voices:
-      - Rachel
-      - Drew
-      - Clyde
-      - Paul
+    backend: "loki"
+    retention_days: 30
+  persona:
+    default: "helpful_assistant"
+    allow_user_override: true
+  system_prompts:
+    post_processing: true
+    image_editing: true
